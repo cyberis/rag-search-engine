@@ -1,25 +1,29 @@
-from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies
+from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords
 import string
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     movies = load_movies()
     results = []
-    preprocessed_query = preprocess_text(query)
+    stopwords = load_stopwords()
+    preprocessed_query = preprocess_text(query, stopwords)
     for movie in movies:
-        if found(preprocessed_query, preprocess_text(movie["title"])):
+        prerocessed_title = preprocess_text(movie["title"], stopwords)
+        if found(preprocessed_query, prerocessed_title):
             results.append(movie)
             if len(results) >= limit:
                 break
     return results
 
-def preprocess_text(text: str) -> set[str]:
+def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase
     text = text.lower()
     # Step two, remove punctuation
     text = text.translate(str.maketrans("", "", string.punctuation))
     # Step three, tokenize (split into words)
     tokens = set(text.split())
+    # Step four, remove stopwords
+    tokens = tokens - stopwords
     return tokens
 
 def found(query_tokens: set[str], title_tokens: set[str]) -> bool:
