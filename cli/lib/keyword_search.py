@@ -7,7 +7,7 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     results = []
     preprocessed_query = preprocess_text(query)
     for movie in movies:
-        if preprocessed_query & preprocess_text(movie["title"]):
+        if found(preprocessed_query, preprocess_text(movie["title"])):
             results.append(movie)
             if len(results) >= limit:
                 break
@@ -21,3 +21,11 @@ def preprocess_text(text: str) -> set[str]:
     # Step three, tokenize (split into words)
     tokens = set(text.split())
     return tokens
+
+def found(query: set[str], title: set[str]) -> bool:
+    # Check if a word in the query is found as a substring in any of the words in the title
+    for q in query:
+        for t in title:
+            if q in t:
+                return True
+    return False
