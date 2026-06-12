@@ -22,10 +22,10 @@ def preprocess_text(text: str) -> set[str]:
     tokens = set(text.split())
     return tokens
 
-def found(query: set[str], title: set[str]) -> bool:
+def found(query_tokens: set[str], title_tokens: set[str]) -> bool:
     # Check if a word in the query is found as a substring in any of the words in the title
-    for q in query:
-        for t in title:
-            if q in t:
+    for query_token in query_tokens:
+        for title_token in title_tokens:
+            if query_token in title_token:
                 return True
     return False
