@@ -11,6 +11,8 @@ from .search_utils import (
     Movie, 
     load_movies, 
     load_stopwords,
+    BM25_K1,
+    BM25_B,
 )
 
 class InvertedIndex:
@@ -127,6 +129,10 @@ def bm25_idf_command(query: str) -> float:
     num_docs_with_token = len(idx.get_documents(query_token))
     total_docs = len(idx.docmap)
     return math.log((total_docs - num_docs_with_token + 0.5) / (num_docs_with_token + 0.5) + 1)
+
+def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1) -> float:
+    tf = tf_command(query, doc_id)
+    return (tf * (k1 + 1)) / (tf + k1)
 
 def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase

@@ -8,6 +8,7 @@ from lib.keyword_search import (
     idf_command, 
     tf_idf_command,
     bm25_idf_command,
+    bm25_tf_command,
 )
 
 def main() -> None:
@@ -24,6 +25,9 @@ def main() -> None:
     tf_idf_parser.add_argument("query", type=str, help="The word to check TF-IDF for")
     bm25_idf_parser = subparsers.add_parser("bm25idf", help="Get BM25 IDF of a word")
     bm25_idf_parser.add_argument("query", type=str, help="The word to check BM25 IDF for")
+    bm25_tf_parser = subparsers.add_parser("bm25tf", help="Get BM25 TF of a word in a document")
+    bm25_tf_parser.add_argument("doc_id", type=int, help="The ID of the document to check")
+    bm25_tf_parser.add_argument("query", type=str, help="The word to check BM25 TF for")
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
     args = parser.parse_args()
@@ -54,6 +58,11 @@ def main() -> None:
         case "bm25idf":
             bm25_idf = bm25_idf_command(args.query)
             print(f"BM25 IDF score of '{args.query}': {bm25_idf:.2f}")
+        case "bm25tf":
+            doc_id = int(args.doc_id)
+            query = args.query
+            bm25_tf = bm25_tf_command(query, doc_id)
+            print(f"BM25 TF score of '{query}' in document {doc_id}: {bm25_tf:.2f}")
         case _:
             parser.print_help()
             
