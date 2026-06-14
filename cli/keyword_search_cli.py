@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
-from lib.keyword_search import search_command, build_command, tf_command, idf_command
+from lib.keyword_search import (
+    search_command, 
+    build_command, 
+    tf_command, 
+    idf_command, 
+    tf_idf_command,
+    bm25_idf_command,
+)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -12,6 +19,11 @@ def main() -> None:
     tf_parser.add_argument("query", type=str, help="The word to check term frequency for")
     idf_parser = subparsers.add_parser("idf", help="Get inverse document frequency of a word")
     idf_parser.add_argument("query", type=str, help="The word to check inverse document frequency for")
+    tf_idf_parser = subparsers.add_parser("tfidf", help="Get TF-IDF of a word in a document")
+    tf_idf_parser.add_argument("doc_id", type=int, help="The ID of the document to check")
+    tf_idf_parser.add_argument("query", type=str, help="The word to check TF-IDF for")
+    bm25_idf_parser = subparsers.add_parser("bm25idf", help="Get BM25 IDF of a word")
+    bm25_idf_parser.add_argument("query", type=str, help="The word to check BM25 IDF for")
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
     args = parser.parse_args()
@@ -34,6 +46,14 @@ def main() -> None:
         case "idf":
             idf = idf_command(args.query)
             print(f"Inverse document frequency of '{args.query}': {idf:.2f}")
+        case "tfidf":
+            doc_id = int(args.doc_id)
+            query = args.query
+            tf_idf = tf_idf_command(query, doc_id)
+            print(f"TF-IDF of '{query}' in document {doc_id}: {tf_idf:.2f}")
+        case "bm25idf":
+            bm25_idf = bm25_idf_command(args.query)
+            print(f"BM25 IDF score of '{args.query}': {bm25_idf:.2f}")
         case _:
             parser.print_help()
             

@@ -111,6 +111,23 @@ def idf_command(query: str) -> float:
         return 0.0
     return math.log((total_docs + 1) / (num_docs_with_token + 1))
 
+def tf_idf_command(query: str, doc_id: int) -> float:
+    tf = tf_command(query, doc_id)
+    idf = idf_command(query)
+    return tf * idf
+
+def bm25_idf_command(query: str) -> float:
+    idx = InvertedIndex()
+    try:        
+        idx.load()
+    except FileNotFoundError:
+        print("Inverted index not found. Please run 'build' command first.")
+        return 0.0
+    query_token = get_token(query, idx.stopwords)
+    num_docs_with_token = len(idx.get_documents(query_token))
+    total_docs = len(idx.docmap)
+    return math.log((total_docs - num_docs_with_token + 0.5) / (num_docs_with_token + 0.5) + 1)
+
 def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase
     text = text.lower()
