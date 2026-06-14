@@ -39,6 +39,12 @@ class InvertedIndex:
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
             
+    def load(self) -> None:
+        with open(self.index_path, "rb") as f:
+            self.index = pickle.load(f)
+        with open(self.docmap_path, "rb") as f:
+            self.docmap = pickle.load(f)
+            
     def get_documents(self, token: str) -> list[int]:
         return sorted(self.index.get(token, set()))
 
@@ -46,18 +52,23 @@ def build_command() -> None:
     idx = InvertedIndex()
     idx.build()
     idx.save()
-    docs = idx.get_documents("merida")
-    print(f"First document for token 'merida' = {docs[0]}")
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
-    movies = load_movies()
-    results = []
-    stopwords = load_stopwords()
-    preprocessed_query = preprocess_text(query, stopwords)
-    for movie in movies:
-        preprocessed_title = preprocess_text(movie["title"], stopwords)
-        if found(preprocessed_query, preprocessed_title):
-            results.append(movie)
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Inverted index not found. Please run 'build' command first.")
+        return []
+    seen, results = set(), []
+    query_tokens = preprocess_text(query, idx.stopwords)
+    for token in query_tokens:
+        doc_ids = idx.get_documents(token)
+        for doc_id in doc_ids:
+            if doc_id in seen:
+                continue
+            seen.add(doc_id)
+            results.append(idx.docmap[doc_id])
             if len(results) >= limit:
                 break
     return results
@@ -76,6 +87,7 @@ def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     tokens = set(stemmer.stem(token) for token in tokens)
     return tokens
 
+# This function is no longer required now that I am using an inverted index, but I will keep it here for reference
 def found(query_tokens: set[str], title_tokens: set[str]) -> bool:
     # Check if a word in the query is found as a substring in any of the words in the title
     for query_token in query_tokens:
