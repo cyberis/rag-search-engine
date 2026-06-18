@@ -23,6 +23,8 @@ class InvertedIndex:
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
         self.term_freqs_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
+        self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
+        self.doc_lengths: dict[int, int] = {}
         self.stopwords = load_stopwords()
         
     def build(self) -> None:
@@ -35,11 +37,17 @@ class InvertedIndex:
 
     def __add_document(self, doc_id: int, text: str) -> None:
         tokens = tokenize(text, self.stopwords)
+        self.doc_lengths[doc_id] = len(tokens)
         for token in tokens:
             self.index[token].add(doc_id)
             if doc_id not in self.term_freqs:
                 self.term_freqs[doc_id] = Counter()
             self.term_freqs[doc_id][token] += 1
+            
+    def get_avg_doc_length(self) -> float:
+        if not self.doc_lengths:
+            return 0.0
+        return sum(self.doc_lengths.values()) / len(self.doc_lengths)
                 
     def save(self) -> None:
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -49,7 +57,9 @@ class InvertedIndex:
             pickle.dump(self.docmap, f)
         with open(self.term_freqs_path, "wb") as f:
             pickle.dump(self.term_freqs, f)
-
+        with open(self.doc_lengths_path, "wb") as f:
+            pickle.dump(self.doc_lengths, f)
+    
     def load(self) -> None:
         with open(self.index_path, "rb") as f:
             self.index = pickle.load(f)
@@ -57,6 +67,8 @@ class InvertedIndex:
             self.docmap = pickle.load(f)
         with open(self.term_freqs_path, "rb") as f:
             self.term_freqs = pickle.load(f)
+        with open(self.doc_lengths_path, "rb") as f:
+            self.doc_lengths = pickle.load(f)
             
     def get_documents(self, token: str) -> list[int]:
         return sorted(self.index.get(token, set()))
@@ -130,9 +142,16 @@ def bm25_idf_command(query: str) -> float:
     total_docs = len(idx.docmap)
     return math.log((total_docs - num_docs_with_token + 0.5) / (num_docs_with_token + 0.5) + 1)
 
-def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1) -> float:
+def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1, b=BM25_B) -> float:
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Inverted index not found. Please run 'build' command first.")
+        return 0.0
     tf = tf_command(query, doc_id)
-    return (tf * (k1 + 1)) / (tf + k1)
+    length_norm = (1 - b) + b * (idx.doc_lengths.get(doc_id, 0) / idx.get_avg_doc_length())
+    return (tf * (k1 + 1)) / (tf + k1 * length_norm)
 
 def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase

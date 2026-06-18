@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from lib.search_utils import BM25_K1, BM25_B
 from lib.keyword_search import (
     search_command, 
     build_command, 
@@ -28,6 +29,8 @@ def main() -> None:
     bm25_tf_parser = subparsers.add_parser("bm25tf", help="Get BM25 TF of a word in a document")
     bm25_tf_parser.add_argument("doc_id", type=int, help="The ID of the document to check")
     bm25_tf_parser.add_argument("query", type=str, help="The word to check BM25 TF for")
+    bm25_tf_parser.add_argument("k1", type=float, nargs="?", default=BM25_K1, help="BM25 k1 parameter")
+    bm25_tf_parser.add_argument("b", type=float, nargs="?", default=BM25_B, help="BM25 b parameter")
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
     args = parser.parse_args()
@@ -61,7 +64,9 @@ def main() -> None:
         case "bm25tf":
             doc_id = int(args.doc_id)
             query = args.query
-            bm25_tf = bm25_tf_command(query, doc_id)
+            k1 = args.k1
+            b = args.b
+            bm25_tf = bm25_tf_command(query, doc_id, k1=k1, b=b)
             print(f"BM25 TF score of '{query}' in document {doc_id}: {bm25_tf:.2f}")
         case _:
             parser.print_help()
