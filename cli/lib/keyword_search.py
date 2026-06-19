@@ -37,14 +37,12 @@ class InvertedIndex:
 
     def __add_document(self, doc_id: int, text: str) -> None:
         tokens = tokenize(text, self.stopwords)
-        self.doc_lengths[doc_id] = len(tokens)
-        for token in tokens:
+        for token in set(tokens):
             self.index[token].add(doc_id)
-            if doc_id not in self.term_freqs:
-                self.term_freqs[doc_id] = Counter()
-            self.term_freqs[doc_id][token] += 1
+        self.term_freqs[doc_id].update(tokens)  # This is a shortcut I discovered in the instructor solution.
+        self.doc_lengths[doc_id] = len(tokens)
             
-    def get_avg_doc_length(self) -> float:
+    def __get_avg_doc_length(self) -> float:
         if not self.doc_lengths:
             return 0.0
         return sum(self.doc_lengths.values()) / len(self.doc_lengths)
@@ -75,6 +73,36 @@ class InvertedIndex:
     
     def get_term_frequency(self, doc_id: int, token: str) -> int:
         return self.term_freqs.get(doc_id, Counter()).get(token, 0)
+    
+    def get_idf(self, token: str) -> float:
+        num_docs_with_token = len(self.get_documents(token))
+        total_docs = len(self.docmap)
+        if num_docs_with_token == 0:
+            return 0.0
+        return math.log((total_docs + 1) / (num_docs_with_token + 1))
+    
+    def get_bm25_idf(self, token: str) -> float:
+        num_docs_with_token = len(self.get_documents(token))
+        total_docs = len(self.docmap)
+        return math.log((total_docs - num_docs_with_token + 0.5) / (num_docs_with_token + 0.5) + 1)
+    
+    def get_bm25_tf(self, doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
+        tf = self.get_term_frequency(doc_id, term)
+        doc_length = self.doc_lengths.get(doc_id, 0)
+        avg_doc_length = self.__get_avg_doc_length()
+        if avg_doc_length > 0:
+            length_norm = 1 - b + b * (doc_length / avg_doc_length)
+        else:
+            length_norm = 1
+        return (tf * (k1 + 1)) / (tf + k1 * length_norm)
+
+    def get_tf_idf(self, doc_id: int, term: str) -> float:
+        tf = self.get_term_frequency(doc_id, term)
+        idf = self.get_idf(term)
+        return tf * idf
+    
+
+#### CLI Commands ####
 
 def build_command() -> None:
     idx = InvertedIndex()
@@ -101,7 +129,7 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
                 break
     return results
 
-def tf_command(query:str, doc_id: int) -> int:
+def tf_command(doc_id: int, query: str) -> int:
     idx = InvertedIndex()
     try:
         idx.load()
@@ -119,14 +147,10 @@ def idf_command(query: str) -> float:
         print("Inverted index not found. Please run 'build' command first.")
         return 0.0
     query_token = get_token(query, idx.stopwords)
-    num_docs_with_token = len(idx.get_documents(query_token))
-    total_docs = len(idx.docmap)
-    if num_docs_with_token == 0:
-        return 0.0
-    return math.log((total_docs + 1) / (num_docs_with_token + 1))
+    return idx.get_idf(query_token)
 
 def tf_idf_command(query: str, doc_id: int) -> float:
-    tf = tf_command(query, doc_id)
+    tf = tf_command(doc_id, query)
     idf = idf_command(query)
     return tf * idf
 
@@ -138,9 +162,7 @@ def bm25_idf_command(query: str) -> float:
         print("Inverted index not found. Please run 'build' command first.")
         return 0.0
     query_token = get_token(query, idx.stopwords)
-    num_docs_with_token = len(idx.get_documents(query_token))
-    total_docs = len(idx.docmap)
-    return math.log((total_docs - num_docs_with_token + 0.5) / (num_docs_with_token + 0.5) + 1)
+    return idx.get_bm25_idf(query_token)
 
 def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1, b=BM25_B) -> float:
     idx = InvertedIndex()
@@ -149,9 +171,8 @@ def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1, b=BM25_B) -> float:
     except FileNotFoundError:
         print("Inverted index not found. Please run 'build' command first.")
         return 0.0
-    tf = tf_command(query, doc_id)
-    length_norm = (1 - b) + b * (idx.doc_lengths.get(doc_id, 0) / idx.get_avg_doc_length())
-    return (tf * (k1 + 1)) / (tf + k1 * length_norm)
+    query_token = get_token(query, idx.stopwords)
+    return idx.get_bm25_tf(doc_id, query_token, k1, b)
 
 def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase

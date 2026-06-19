@@ -48,7 +48,7 @@ def main() -> None:
         case "tf":
             doc_id = int(args.doc_id)
             query = args.query
-            tf = tf_command(query, doc_id)
+            tf = tf_command(doc_id, query)
             print(f"Term frequency of '{query}' in document {doc_id}: {tf}")
         case "idf":
             idf = idf_command(args.query)
