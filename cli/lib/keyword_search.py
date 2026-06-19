@@ -101,6 +101,21 @@ class InvertedIndex:
         idf = self.get_idf(term)
         return tf * idf
     
+    def bm25(self, doc_id: int, token: str, k1: float = BM25_K1, b: float = BM25_B) -> float:
+        bm25_idf = self.get_bm25_idf(token)
+        bm25_tf = self.get_bm25_tf(doc_id, token, k1, b)
+        return bm25_idf * bm25_tf
+    
+    def bm25_search(self, query: str, k1: float = BM25_K1, b: float = BM25_B) -> list[tuple[int, float]]:
+        query_tokens = tokenize(query, self.stopwords)
+        scores: dict[int, float] = {}
+        for doc_id in self.docmap.keys():
+            scores[doc_id] = 0.0
+        for query_token in query_tokens:
+            for doc_id in self.docmap.keys():
+                scores[doc_id] += self.bm25(doc_id, query_token, k1, b)
+        scores = dict(sorted(scores.items(), key=lambda item: item[1], reverse=True))
+        return list(scores.items())[0:DEFAULT_SEARCH_LIMIT - 1]
 
 #### CLI Commands ####
 
@@ -173,6 +188,19 @@ def bm25_tf_command(query: str, doc_id: int, k1=BM25_K1, b=BM25_B) -> float:
         return 0.0
     query_token = get_token(query, idx.stopwords)
     return idx.get_bm25_tf(doc_id, query_token, k1, b)
+
+def bm25_search_command(query: str, k1=BM25_K1, b=BM25_B) -> list[tuple[int, str, float]]:
+    results = []
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Inverted index not found. Please run 'build' command first.")
+        return results
+    scores = idx.bm25_search(query, k1, b)
+    for doc_id, score in scores:
+        results.append((doc_id, idx.docmap[doc_id]['title'], score))
+    return results
 
 def preprocess_text(text: str, stopwords: set[str]) -> set[str]:
     # Step one, make lowercase
