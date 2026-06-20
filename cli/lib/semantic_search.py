@@ -1,59 +1,58 @@
-from sentence_transformers import SentenceTransformer
-import numpy as np
-from torch import Tensor
-from typing import Any, TypedDict
 import os
-import json
 
-DEFAULT_SEARCH_LIMIT = 5
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-CACHE_DIR = os.path.join(PROJECT_ROOT, "cache")
-EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "embeddings.npy")
-DATA_PATH = os.path.join(PROJECT_ROOT, "data", "movies.json")
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
+from .search_utils import CACHE_DIR, DEFAULT_SEARCH_LIMIT, load_movies
 
-class Movie(TypedDict):
-    id: int
-    title: str
-    description: str
+MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
 
 
 class SemanticSearch:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
-        self.embeddings: Tensor = Tensor([])
-        self.documents: list[Movie] = []
-        self.document_map: dict[int, Movie] = {}
-        
-    def generate_embedding(self, text: str) -> Tensor:
-        if not text.strip():
-            raise ValueError("Input text cannot be empty.")
-        return self.model.encode(text)
-    
-    def build_embeddings(self, documents: list[Movie]) -> Tensor:
+        self.embeddings = None
+        self.documents = None
+        self.document_map = {}
+
+    def generate_embedding(self, text):
+        if not text or not text.strip():
+            raise ValueError("cannot generate embedding for empty text")
+        return self.model.encode([text])[0]
+
+    def build_embeddings(self, documents):
         self.documents = documents
-        self.document_map = {doc["id"]: doc for doc in documents}
-        texts = [f"{doc['title']} {doc['description']}" for doc in documents]
-        self.embeddings = self.model.encode(texts, show_progress_bar=True)
-        np.save(EMBEDDINGS_PATH, self.embeddings)
+        self.document_map = {}
+        movie_strings = []
+        for doc in documents:
+            self.document_map[doc["id"]] = doc
+            movie_strings.append(f"{doc['title']}: {doc['description']}")
+        self.embeddings = self.model.encode(movie_strings, show_progress_bar=True)
+
+        os.makedirs(os.path.dirname(MOVIE_EMBEDDINGS_PATH), exist_ok=True)
+        np.save(MOVIE_EMBEDDINGS_PATH, self.embeddings)
         return self.embeddings
-    
-    def load_or_create_embeddings(self, documents: list[Movie]) -> Tensor:
-        if os.path.exists(EMBEDDINGS_PATH):
-            self.embeddings = np.load(EMBEDDINGS_PATH)
-            self.documents = documents
-            self.document_map = {doc["id"]: doc for doc in documents}
-            return self.embeddings
-        else:
-            return self.build_embeddings(documents)
+
+    def load_or_create_embeddings(self, documents):
+        self.documents = documents
+        self.document_map = {}
+        for doc in documents:
+            self.document_map[doc["id"]] = doc
+
+        if os.path.exists(MOVIE_EMBEDDINGS_PATH):
+            self.embeddings = np.load(MOVIE_EMBEDDINGS_PATH)
+            if len(self.embeddings) == len(documents):
+                return self.embeddings
+
+        return self.build_embeddings(documents)
 
     def search(self, query, limit=DEFAULT_SEARCH_LIMIT):
-        if self.embeddings.size == 0:
+        if self.embeddings is None or self.embeddings.size == 0:
             raise ValueError(
                 "No embeddings loaded. Call `load_or_create_embeddings` first."
             )
 
-        if len(self.documents) == 0:
+        if self.documents is None or len(self.documents) == 0:
             raise ValueError(
                 "No documents loaded. Call `load_or_create_embeddings` first."
             )
@@ -62,9 +61,7 @@ class SemanticSearch:
 
         similarities = []
         for i, doc_embedding in enumerate(self.embeddings):
-            qe_array = query_embedding.detach().cpu().numpy()
-            de_array = doc_embedding.detach().cpu().numpy()
-            similarity = cosine_similarity(qe_array, de_array)
+            similarity = cosine_similarity(query_embedding, doc_embedding)
             similarities.append((similarity, self.documents[i]))
 
         similarities.sort(key=lambda x: x[0], reverse=True)
@@ -81,40 +78,40 @@ class SemanticSearch:
 
         return results
 
+#### CLI Commands ###
+
+def verify_model():
+    search_instance = SemanticSearch()
+    print(f"Model loaded: {search_instance.model}")
+    print(f"Max sequence length: {search_instance.model.max_seq_length}")
 
 
-#### CLI Commands ####
-def verify_model() -> None:
-    try:
-        search = SemanticSearch()
-        print(f"Model loaded: {search.model}")
-        print(f"Max sequence length: {search.model.max_seq_length}")
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        
-def embed_text(text: str) -> None:
-    search = SemanticSearch()
-    embedding =  search.generate_embedding(text)
+def embed_text(text):
+    search_instance = SemanticSearch()
+    embedding = search_instance.generate_embedding(text)
     print(f"Text: {text}")
     print(f"First 3 dimensions: {embedding[:3]}")
     print(f"Dimensions: {embedding.shape[0]}")
 
-def verify_embeddings() -> None:
-    search = SemanticSearch()
-    with open(DATA_PATH, "r") as f:
-        data = json.load(f)
-    movies: list[Movie] = data["movies"]
-    embeddings = search.load_or_create_embeddings(movies)
-    print(f"Number of documents: {len(search.documents)}")
-    print(f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
-    
-def embed_query_text(text: str) -> None:
-    search = SemanticSearch()
-    embedding =  search.generate_embedding(text)
-    print(f"Text: {text}")
+
+def verify_embeddings():
+    search_instance = SemanticSearch()
+    documents = load_movies()
+    embeddings = search_instance.load_or_create_embeddings(documents)
+    print(f"Number of docs:   {len(documents)}")
+    print(
+        f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions"
+    )
+
+
+def embed_query_text(query):
+    search_instance = SemanticSearch()
+    embedding = search_instance.generate_embedding(query)
+    print(f"Query: {query}")
     print(f"First 3 dimensions: {embedding[:3]}")
-    print(f"Dimensions: {embedding.shape[0]}")
-    
+    print(f"Shape: {embedding.shape}")
+
+
 def semantic_search(query, limit=DEFAULT_SEARCH_LIMIT):
     search_instance = SemanticSearch()
     documents = load_movies()
@@ -130,15 +127,10 @@ def semantic_search(query, limit=DEFAULT_SEARCH_LIMIT):
         print(f"{i}. {result['title']} (score: {result['score']:.4f})")
         print(f"   {result['description'][:100]}...")
         print()
-    
+
 #### Utility Functions ####
 
-def load_movies() -> list[Movie]:
-    with open(DATA_PATH, "r") as f:
-        data = json.load(f)
-    return data["movies"]
-    
-def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+def cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
     norm1 = np.linalg.norm(vec1)
     norm2 = np.linalg.norm(vec2)
