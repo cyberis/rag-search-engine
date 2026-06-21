@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 
 import argparse
+from lib.search_utils import (
+    DEFAULT_CHUNK_OVERLAP, 
+    DEFAULT_CHUNK_SIZE,
+)
 from lib.semantic_search import (
     verify_model,
     embed_text,
     verify_embeddings,
     embed_query_text,
     semantic_search,
+    chunk_text,
 )
 
 def main() -> None:
@@ -19,6 +24,10 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Search for movies using semantic search")
     search_parser.add_argument("query", type=str, help="Search query")
     search_parser.add_argument("--limit", type=int, default=5, help="Number of results to return")
+    chunk_parser = subparsers.add_parser("chunk", help="Chunk input text into smaller pieces")
+    chunk_parser.add_argument("text", type=str, help="Text to chunk")
+    chunk_parser.add_argument("--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE, help="Number of words per chunk")
+    chunk_parser.add_argument("--overlap", type=int, default=DEFAULT_CHUNK_OVERLAP, help="Number of words to overlap between chunks")   
     args = parser.parse_args()
     
     match args.command:
@@ -32,6 +41,11 @@ def main() -> None:
             embed_query_text(args.text)
         case "search":
             semantic_search(args.query, args.limit)
+        case "chunk":
+            chunks = chunk_text(args.text, args.chunk_size, args.overlap)
+            print(f"Chunking {len(args.text)} characters")
+            for i, chunk in enumerate(chunks, 1):
+                print(f"{i}. {chunk}")
         case _:
             parser.print_help()
 
