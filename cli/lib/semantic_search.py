@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -8,6 +9,7 @@ from .search_utils import (
     DEFAULT_SEARCH_LIMIT, 
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_MAX_CHUNK_SIZE,
     load_movies,
 )
 
@@ -142,6 +144,17 @@ def chunk_text(text, chunk_size=DEFAULT_CHUNK_SIZE, chunk_overlap=DEFAULT_CHUNK_
         chunk = " ".join(words[i : i + chunk_size])
         chunks.append(chunk)
         if i + chunk_size >= len(words):
+            break
+    return chunks
+
+
+def semantic_chunk_text(text, chunk_size=DEFAULT_CHUNK_SIZE, chunk_overlap=DEFAULT_CHUNK_OVERLAP):
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+    for i in range(0, len(sentences), chunk_size - chunk_overlap):
+        chunk = " ".join(sentences[i : i + chunk_size])
+        chunks.append(chunk)
+        if i + chunk_size >= len(sentences):
             break
     return chunks
 
