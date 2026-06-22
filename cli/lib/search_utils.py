@@ -6,7 +6,7 @@ import string
 DEFAULT_SEARCH_LIMIT = 5
 DEFAULT_CHUNK_SIZE = 200
 DEFAULT_MAX_CHUNK_SIZE = 4
-DEFAULT_CHUNK_OVERLAP = 0
+DEFAULT_CHUNK_OVERLAP = 1
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 DATA_PATH = os.path.join(PROJECT_ROOT, "data", "movies.json")
 STOPWORDS_PATH = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
