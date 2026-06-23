@@ -8,12 +8,16 @@ from sentence_transformers import SentenceTransformer
 
 from .search_utils import (
     CACHE_DIR, 
-    DEFAULT_SEARCH_LIMIT, 
+    DEFAULT_SEARCH_LIMIT,
+    DEFAULT_CHUNK_SEARCH_LIMIT, 
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_MAX_CHUNK_SIZE,
+    SCORE_PRECISION,
     load_movies,
-    Movie
+    format_search_result,
+    Movie,
+    SearchResult,
 )
 
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
@@ -139,6 +143,44 @@ class ChunkedSemanticSearch(SemanticSearch):
                     return self.chunk_embeddings
 
         return self.build_chunk_embeddings(documents)
+    
+    def search_chunks(self, query: str, limit: int = DEFAULT_CHUNK_SEARCH_LIMIT):
+        if self.chunk_embeddings is None or self.chunk_embeddings.size == 0:
+            raise ValueError(
+                "No chunk embeddings loaded. Call `load_or_create_chunk_embeddings` first."
+            )
+
+        if self.chunk_metadata is None or len(self.chunk_metadata) == 0:
+            raise ValueError(
+                "No chunk metadata loaded. Call `load_or_create_chunk_embeddings` first."
+            )
+
+        query_embedding = self.generate_embedding(query)
+
+        similarities = []
+        for i, chunk_embedding in enumerate(self.chunk_embeddings):
+            similarity = cosine_similarity(query_embedding, chunk_embedding)
+            similarities.append((similarity, self.chunk_metadata[i]))
+
+        similarities.sort(key=lambda x: x[0], reverse=True)
+        
+        movie_scores = {}
+        for score, metadata in similarities:
+            movie_idx = metadata["movie_idx"]
+            if movie_idx not in movie_scores:
+                movie_scores[movie_idx] = score
+            else:
+                movie_scores[movie_idx] = max(movie_scores[movie_idx], score)
+        
+        sorted_movies = sorted(movie_scores.items(), key=lambda x: x[1], reverse=True)
+
+        results = []
+        for movie_idx, score in sorted_movies[:limit]:
+            movie = self.document_map[movie_idx]
+            result = format_search_result(movie_idx, movie["title"], movie["description"], score, chunk_idx=metadata["chunk_idx"])
+            results.append(result)
+
+        return results
 
 class ChunkMetadata(TypedDict):
     movie_idx: int
@@ -209,7 +251,14 @@ def chunk_text(text, chunk_size=DEFAULT_MAX_CHUNK_SIZE, chunk_overlap=DEFAULT_CH
 
 
 def semantic_chunk_text(text, chunk_size=DEFAULT_CHUNK_SIZE, chunk_overlap=DEFAULT_CHUNK_OVERLAP):
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+    text = text.strip()
+    if not text:
+        return []
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if not sentences:
+        return []
+    if len(sentences) == 1:
+        return sentences
     chunks = []
     for i in range(0, len(sentences), chunk_size - chunk_overlap):
         chunk = " ".join(sentences[i : i + chunk_size])
