@@ -4,4 +4,5 @@ Added Document Length correction.
 TODO: Refactor commands to object methdods.
 TODO: Finish implementing the optimized BM25 search.
 Now with super duper BM25 search.
-Now building semantic chunking and searching
+Now building semantic chunking and searching: DONE
+Working on Hybrid Search
