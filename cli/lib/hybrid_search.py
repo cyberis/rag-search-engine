@@ -24,7 +24,7 @@ class HybridSearch:
 
     def _bm25_search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
         self.idx.load()
-        return self.idx.bm25_search(query, limit)
+        return self.idx.bm25_search(query, limit) # type: ignore
 
     def weighted_search(self, query: str, alpha: float, limit: int = 5) -> list[dict]:
         bm25_results = self._bm25_search(query, limit * 500)
@@ -185,7 +185,7 @@ def weighted_search_command(
     query: str, alpha: float = DEFAULT_ALPHA, limit: int = DEFAULT_SEARCH_LIMIT
 ) -> dict:
     movies = load_movies()
-    searcher = HybridSearch(movies)
+    searcher = HybridSearch(movies) # type: ignore
 
     original_query = query
 
@@ -206,7 +206,7 @@ def rrf_search_command(
     limit: int = DEFAULT_SEARCH_LIMIT,
 ) -> dict:
     movies = load_movies()
-    searcher = HybridSearch(movies)
+    searcher = HybridSearch(movies) # type: ignore
 
     original_query = query
 

@@ -343,12 +343,12 @@ class ChunkedSemanticSearch(SemanticSearch):
 def embed_chunks_command():
     movies = load_movies()
     searcher = ChunkedSemanticSearch()
-    return searcher.load_or_create_chunk_embeddings(movies)
+    return searcher.load_or_create_chunk_embeddings(movies) # type: ignore
 
 
 def search_chunked_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> dict:
     movies = load_movies()
     searcher = ChunkedSemanticSearch()
-    searcher.load_or_create_chunk_embeddings(movies)
+    searcher.load_or_create_chunk_embeddings(movies) # type: ignore
     results = searcher.search_chunks(query, limit)
     return {"query": query, "results": results}
