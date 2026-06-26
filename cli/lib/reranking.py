@@ -44,42 +44,50 @@ def llm_rerank_individual(
     scored_docs.sort(key=lambda x: x["individual_score"], reverse=True)
     return scored_docs[:limit]
 
-def llm_rerank_batch(
-    query: str, documents: list[dict], limit: int = 5
-) -> list[dict]:
-    doc_list_str = "\n".join(
-        [f"{doc.get('id', '')}: {doc.get('title', '')} - {doc.get('document', '')}" for doc in documents]
-    )
+def llm_rerank_batch(query: str, documents: list[dict], limit: int = 5) -> list[dict]:
+    if not documents:
+        return []
+
+    doc_map = {}
+    doc_list = []
+    for doc in documents:
+        doc_id = doc["id"]
+        doc_map[doc_id] = doc
+        doc_list.append(
+            f"{doc_id}: {doc.get('title', '')} - {doc.get('document', '')[:200]}"
+        )
+
+    doc_list_str = "\n".join(doc_list)
+
     prompt = f"""Rank the movies listed below by relevance to the following search query.
 
-Query: "{query}"
+    Query: "{query}"
 
-Movies:
-{doc_list_str}
+    Movies:
+    {doc_list_str}
 
-Return the movie IDs in order of relevance, best match first.
+    Return the movie IDs in order of relevance, best match first.
 
-Your response must be a raw JSON array of integers.
-Do not wrap the JSON in Markdown. Do not use a ```json code block.
-Do not include any explanatory text.
+    Your response must be a raw JSON array of integers.
+    Do not wrap the JSON in Markdown. Do not use a ```json code block.
+    Do not include any explanatory text.
 
-For example:
-[75, 12, 34, 2, 1]
+    For example:
+    [75, 12, 34, 2, 1]
 
-Ranking:"""
+    Ranking:"""
 
     response = client.models.generate_content(model=model, contents=prompt)
-    scores_text = (response.text or "").strip()
-    # Extract integer from the response returneed as a JSON array of integers
-    scores = json.loads(scores_text)
+    ranking_text = (response.text or "").strip()
 
-    scored_docs = []
-    for doc, score in zip(documents, scores):
-        scored_docs.append({**doc, "batch_score": score})
+    parsed_ids = json.loads(ranking_text)
 
-    scored_docs.sort(key=lambda x: x["batch_score"], reverse=True)
-    return scored_docs[:limit]
+    reranked = []
+    for i, doc_id in enumerate(parsed_ids):
+        if doc_id in doc_map:
+            reranked.append({**doc_map[doc_id], "batch_rank": i + 1})
 
+    return reranked[:limit]
 
 
 def rerank(
@@ -87,5 +95,7 @@ def rerank(
 ) -> list[dict]:
     if method == "individual":
         return llm_rerank_individual(query, documents, limit)
+    if method == "batch":
+        return llm_rerank_batch(query, documents, limit)
     else:
         return documents[:limit]
