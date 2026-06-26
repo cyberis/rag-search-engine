@@ -1,4 +1,5 @@
 import os
+import json
 from time import sleep
 
 from dotenv import load_dotenv
@@ -42,6 +43,43 @@ def llm_rerank_individual(
 
     scored_docs.sort(key=lambda x: x["individual_score"], reverse=True)
     return scored_docs[:limit]
+
+def llm_rerank_batch(
+    query: str, documents: list[dict], limit: int = 5
+) -> list[dict]:
+    doc_list_str = "\n".join(
+        [f"{doc.get('id', '')}: {doc.get('title', '')} - {doc.get('document', '')}" for doc in documents]
+    )
+    prompt = f"""Rank the movies listed below by relevance to the following search query.
+
+Query: "{query}"
+
+Movies:
+{doc_list_str}
+
+Return the movie IDs in order of relevance, best match first.
+
+Your response must be a raw JSON array of integers.
+Do not wrap the JSON in Markdown. Do not use a ```json code block.
+Do not include any explanatory text.
+
+For example:
+[75, 12, 34, 2, 1]
+
+Ranking:"""
+
+    response = client.models.generate_content(model=model, contents=prompt)
+    scores_text = (response.text or "").strip()
+    # Extract integer from the response returneed as a JSON array of integers
+    scores = json.loads(scores_text)
+
+    scored_docs = []
+    for doc, score in zip(documents, scores):
+        scored_docs.append({**doc, "batch_score": score})
+
+    scored_docs.sort(key=lambda x: x["batch_score"], reverse=True)
+    return scored_docs[:limit]
+
 
 
 def rerank(
