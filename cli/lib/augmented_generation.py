@@ -172,3 +172,52 @@ def citations_command(query, limit=DEFAULT_SEARCH_LIMIT):
         "search_results": search_results[:limit],
         "citations": citations,
     }
+    
+    
+def generate_movie_answer(question, search_results, limit=5):
+    context = ""
+
+    for result in search_results[:limit]:
+        context += f"{result['title']}: {result['document']}\n\n"
+
+    prompt = f"""Answer the user's question based on the provided movies that are available on Hoopla, a streaming service.
+
+Question: {question}
+
+Documents:
+{context}
+
+Instructions:
+- Answer questions directly and concisely
+- Be casual and conversational
+- Don't be cringe or hype-y
+- Talk like a normal person would in a chat conversation
+
+Answer:"""
+
+    response = client.models.generate_content(model=model, contents=prompt)
+    return (response.text or "").strip()
+
+
+def question_command(question, limit=DEFAULT_SEARCH_LIMIT):
+    movies = load_movies_dict()
+    hybrid_search = HybridSearch(movies)
+
+    search_results = hybrid_search.rrf_search(
+        question, k=RRF_K, limit=limit * SEARCH_MULTIPLIER
+    )
+
+    if not search_results:
+        return {
+            "question": question,
+            "search_results": [],
+            "error": "No results found",
+        }
+
+    answer = generate_movie_answer(question, search_results, limit)
+
+    return {
+        "question": question,
+        "search_results": search_results[:limit],
+        "answer": answer,
+    }

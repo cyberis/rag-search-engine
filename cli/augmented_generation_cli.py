@@ -1,6 +1,6 @@
 import argparse
 
-from lib.augmented_generation import rag_command, summarize_command, citations_command
+from lib.augmented_generation import rag_command, summarize_command, citations_command, question_command
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Retrieval Augmented Generation CLI")
@@ -22,6 +22,13 @@ def main() -> None:
     )
     citations_parser.add_argument("query", type=str, help="Search query for citations")
     citations_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results to return (default=5)"
+    )
+    question_parser = subparsers.add_parser(
+        "question", help="Answer a question using RAG"
+    )
+    question_parser.add_argument("query", type=str, help="Search query for question answering")
+    question_parser.add_argument(
         "--limit", type=int, default=5, help="Number of results to return (default=5)"
     )
 
@@ -52,6 +59,14 @@ def main() -> None:
             print()
             print("LLM Answer:")
             print(result["citations"])
+        case "question":
+            result = question_command(args.query, args.limit)
+            print("Search Results:")
+            for document in result["search_results"]:
+                print(f"  - {document['title']}")
+            print()
+            print("Answer:")
+            print(result["answer"])
         case _:
             parser.print_help()
 
